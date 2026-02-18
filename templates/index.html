@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wordle</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<h1>Wordle</h1>
+
+<div id="board"></div>
+
+<input id="input" maxlength="5" autofocus />
+<button onclick="submitGuess()">Enter</button>
+
+<div id="message"></div>
+
+<script>
+const board = document.getElementById("board");
+const input = document.getElementById("input");
+const message = document.getElementById("message");
+
+let row = 0;
+let gameOver = false;
+
+for (let r = 0; r < 6; r++) {
+    let rowDiv = document.createElement("div");
+    rowDiv.className = "row";
+    for (let c = 0; c < 5; c++) {
+        let tile = document.createElement("div");
+        tile.className = "tile";
+        tile.id = `tile-${r}-${c}`;
+        rowDiv.appendChild(tile);
+    }
+    board.appendChild(rowDiv);
+}
+
+function submitGuess() {
+    if (gameOver) return;
+
+    const guess = input.value.toLowerCase();
+    if (guess.length !== 5) return;
+
+    fetch("/guess", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({guess})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            message.innerText = data.error;
+            return;
+        }
+
+        for (let i = 0; i < 5; i++) {
+            const tile = document.getElementById(`tile-${row}-${i}`);
+            tile.innerText = guess[i].toUpperCase();
+            tile.classList.add(data.pattern[i]);
+        }
+
+        row++;
+        input.value = "";
+
+        if (data.game_over) {
+            gameOver = true;
+            input.disabled = true;
+
+            if (data.pattern === "GGGGG") {
+                message.innerText = "Correct! The word was " + data.final_word.toUpperCase();
+            } else {
+                message.innerText = "Unlucky. The word was " + data.final_word.toUpperCase();
+            }
+        }
+    });
+}
+
+input.addEventListener("keypress", function(event) {
+    if (event.key === "Enter") {
+        submitGuess();
+    }
+});
+</script>
+
+</body>
+</html>
