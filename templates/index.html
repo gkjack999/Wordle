@@ -5,9 +5,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+
 <h1>Wordle</h1>
 
 <div id="board"></div>
+
+<div id="keyboard"></div>
 
 <input id="input" maxlength="5" autofocus />
 <button onclick="submitGuess()">Enter</button>
@@ -18,10 +21,13 @@
 const board = document.getElementById("board");
 const input = document.getElementById("input");
 const message = document.getElementById("message");
+const keyboard = document.getElementById("keyboard");
 
 let row = 0;
 let gameOver = false;
+let keyStates = {}; // Track best state per letter
 
+// Create board
 for (let r = 0; r < 6; r++) {
     let rowDiv = document.createElement("div");
     rowDiv.className = "row";
@@ -33,6 +39,55 @@ for (let r = 0; r < 6; r++) {
     }
     board.appendChild(rowDiv);
 }
+
+// Create keyboard
+const layout = [
+    "QWERTYUIOP",
+    "ASDFGHJKL",
+    "ZXCVBNM"
+];
+
+layout.forEach((letters, index) => {
+    const rowDiv = document.createElement("div");
+    rowDiv.className = "key-row";
+
+    // Add Enter on last row
+    if (index === 2) {
+        const enterKey = document.createElement("div");
+        enterKey.className = "key special";
+        enterKey.innerText = "ENTER";
+        enterKey.onclick = submitGuess;
+        rowDiv.appendChild(enterKey);
+    }
+
+    letters.split("").forEach(letter => {
+        const key = document.createElement("div");
+        key.className = "key";
+        key.id = "key-" + letter;
+        key.innerText = letter;
+
+        key.onclick = () => {
+            if (!gameOver && input.value.length < 5) {
+                input.value += letter.toLowerCase();
+            }
+        };
+
+        rowDiv.appendChild(key);
+    });
+
+    // Add Backspace on last row
+    if (index === 2) {
+        const backKey = document.createElement("div");
+        backKey.className = "key special";
+        backKey.innerText = "⌫";
+        backKey.onclick = () => {
+            input.value = input.value.slice(0, -1);
+        };
+        rowDiv.appendChild(backKey);
+    }
+
+    keyboard.appendChild(rowDiv);
+});
 
 function submitGuess() {
     if (gameOver) return;
@@ -56,6 +111,23 @@ function submitGuess() {
             const tile = document.getElementById(`tile-${row}-${i}`);
             tile.innerText = guess[i].toUpperCase();
             tile.classList.add(data.pattern[i]);
+
+            // Update keyboard colours
+            const letter = guess[i].toUpperCase();
+            const result = data.pattern[i];
+            const key = document.getElementById("key-" + letter);
+            if (!key) continue;
+
+            const current = keyStates[letter];
+
+            if (result === "G" ||
+                (result === "Y" && current !== "G") ||
+                (result === "B" && !current)) {
+
+                keyStates[letter] = result;
+                key.classList.remove("G", "Y", "B");
+                key.classList.add(result);
+            }
         }
 
         row++;

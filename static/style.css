@@ -3,32 +3,35 @@ body {
     text-align: center;
     background: #121213;
     color: white;
+    margin: 0;
+    padding: 8px;
 }
 
 h1 {
-    margin-bottom: 20px;
+    margin: 8px 0 12px 0;
+    font-size: 1.7rem;
 }
 
 #board {
     display: grid;
-    gap: 5px;
+    gap: 4px;
     justify-content: center;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .row {
     display: flex;
-    gap: 5px;
+    gap: 4px;
 }
 
 .tile {
-    width: 60px;
-    height: 60px;
+    width: 46px;          /* was 50 */
+    height: 46px;
     border: 2px solid #3a3a3c;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 2rem;
+    font-size: 1.5rem;    /* slightly smaller */
     font-weight: bold;
     background: #121213;
 }
@@ -48,14 +51,58 @@ h1 {
     border-color: #3a3a3c;
 }
 
+/* Keyboard */
+
+#keyboard {
+    margin-top: 12px;
+}
+
+.key-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 4px;
+}
+
+.key {
+    width: 32px;      /* was 35 */
+    height: 45px;     /* was 48 */
+    margin: 2px;
+    background: #818384;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.85rem;
+}
+
+.key.special {
+    width: 52px;
+    font-size: 0.75rem;
+}
+
+.key.G {
+    background: #6aaa64;
+}
+
+.key.Y {
+    background: #c9b458;
+}
+
+.key.B {
+    background: #3a3a3c;
+}
+
 input {
-    font-size: 1.2rem;
-    padding: 10px;
-    text-transform: lowercase;
+    font-size: 0.95rem;
+    padding: 6px;
+    margin-top: 10px;
 }
 
 button {
-    padding: 10px 20px;
-    font-size: 1rem;
+    padding: 6px 12px;
+    font-size: 0.9rem;
     margin-left: 5px;
 }
