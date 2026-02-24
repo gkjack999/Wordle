@@ -11,6 +11,8 @@
 <div style="margin-bottom:15px;">
     <button onclick="startNewGame('easy')">Easy</button>
     <button onclick="startNewGame('hard')">Hard</button>
+    <button onclick="startNewGame('daily_easy')">Daily Easy</button>
+    <button onclick="startNewGame('daily_hard')">Daily Hard</button>
 </div>
 
 <div id="board"></div>
@@ -28,7 +30,7 @@ let gameOver = false;
 let currentGuess = "";
 let keyStates = {};
 
-// ---------------- Create Board ----------------
+// Create board
 for (let r = 0; r < 6; r++) {
     let rowDiv = document.createElement("div");
     rowDiv.className = "row";
@@ -41,7 +43,7 @@ for (let r = 0; r < 6; r++) {
     board.appendChild(rowDiv);
 }
 
-// ---------------- Keyboard ----------------
+// Keyboard layout
 const layout = [
     "QWERTYUIOP",
     "ASDFGHJKL",
@@ -80,7 +82,33 @@ layout.forEach((letters, index) => {
     keyboard.appendChild(rowDiv);
 });
 
-// ---------------- Typing Logic ----------------
+// Load existing state (for daily)
+async function loadExistingState() {
+    const res = await fetch("/get_state");
+    const game = await res.json();
+
+    if (!game.guesses) return;
+
+    for (let r = 0; r < game.guesses.length; r++) {
+        const guess = game.guesses[r];
+
+        for (let c = 0; c < 5; c++) {
+            const tile = document.getElementById(`tile-${r}-${c}`);
+            tile.innerText = guess.word[c].toUpperCase();
+            tile.classList.add(guess.pattern[c]);
+        }
+
+        row++;
+    }
+
+    if (game.game_over) {
+        gameOver = true;
+    }
+}
+
+window.onload = loadExistingState;
+
+// Typing
 function addLetter(letter) {
     if (gameOver || col >= 5) return;
 
@@ -137,11 +165,10 @@ async function submitGuess() {
 
     if (data.game_over) {
         gameOver = true;
-        if (data.pattern === "GGGGG") {
-            message.innerText = "Correct! The word was " + data.final_word.toUpperCase();
-        } else {
-            message.innerText = "Unlucky. The word was " + data.final_word.toUpperCase();
-        }
+        message.innerText =
+            data.pattern === "GGGGG"
+                ? "Correct! The word was " + data.final_word.toUpperCase()
+                : "Unlucky. The word was " + data.final_word.toUpperCase();
         return;
     }
 
@@ -150,7 +177,14 @@ async function submitGuess() {
     currentGuess = "";
 }
 
-// ---------------- Physical Keyboard ----------------
+function startNewGame(mode) {
+    fetch("/new_game", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({mode})
+    }).then(() => location.reload());
+}
+
 document.addEventListener("keydown", function(event) {
     if (gameOver) return;
 
@@ -164,17 +198,6 @@ document.addEventListener("keydown", function(event) {
         submitGuess();
     }
 });
-
-// ---------------- Mode Switch ----------------
-function startNewGame(mode) {
-    fetch("/new_game", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({mode})
-    }).then(() => {
-        location.reload();
-    });
-}
 </script>
 
 </body>

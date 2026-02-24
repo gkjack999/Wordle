@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, session, jsonify
 from collections import defaultdict
 import random
 import uuid
+import datetime
 
 app = Flask(__name__)
 app.secret_key = "evil_secret_key"
@@ -50,7 +51,7 @@ def score_pattern(guess, answer):
 
 
 # ---------------------------
-# Evil bucket selection
+# Adversarial bucket selection
 # ---------------------------
 
 def choose_max_remaining_bucket(guess, candidates):
@@ -72,6 +73,15 @@ def choose_max_remaining_bucket(guess, candidates):
 
 
 # ---------------------------
+# Deterministic daily word
+# ---------------------------
+
+def get_daily_word(word_list):
+    today_index = datetime.date.today().toordinal()
+    return word_list[today_index % len(word_list)]
+
+
+# ---------------------------
 # Game state
 # ---------------------------
 
@@ -79,19 +89,33 @@ def new_game(mode="hard"):
     game_id = str(uuid.uuid4())
     session["game_id"] = game_id
 
-    if mode == "easy":
+    if mode in ["easy", "daily_easy"]:
         candidates = answers.copy()
     else:
         candidates = ALL_WORDS.copy()
 
-    GAMES[game_id] = {
+    state = {
         "mode": mode,
         "candidates": candidates,
         "guesses": [],
         "game_over": False,
     }
 
-    return game_id, GAMES[game_id]
+    # Auto-play daily first word
+    if mode == "daily_easy":
+        start_word = get_daily_word(answers)
+        pattern, new_candidates = choose_max_remaining_bucket(start_word, candidates)
+        state["candidates"] = new_candidates
+        state["guesses"].append({"word": start_word, "pattern": pattern})
+
+    if mode == "daily_hard":
+        start_word = get_daily_word(ALL_WORDS)
+        pattern, new_candidates = choose_max_remaining_bucket(start_word, candidates)
+        state["candidates"] = new_candidates
+        state["guesses"].append({"word": start_word, "pattern": pattern})
+
+    GAMES[game_id] = state
+    return game_id, state
 
 
 def get_game():
@@ -115,6 +139,12 @@ def start_game():
     mode = request.json.get("mode", "hard")
     new_game(mode)
     return jsonify({"status": "ok"})
+
+
+@app.route("/get_state", methods=["GET"])
+def get_state():
+    _, game = get_game()
+    return jsonify(game)
 
 
 @app.route("/guess", methods=["POST"])
@@ -142,7 +172,6 @@ def guess():
     if pattern == "GGGGG" or len(game["guesses"]) >= MAX_GUESSES:
         game["game_over"] = True
 
-        # Reveal logic
         remaining_answers = [w for w in new_candidates if w in answers_set]
 
         if remaining_answers:
