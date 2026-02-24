@@ -80,23 +80,18 @@ def new_game(mode="hard"):
     session["game_id"] = game_id
 
     if mode == "easy":
-        secret = random.choice(answers)
-        state = {
-            "mode": "easy",
-            "secret": secret,
-            "guesses": [],
-            "game_over": False,
-        }
+        candidates = answers.copy()
     else:
-        state = {
-            "mode": "hard",
-            "candidates": ALL_WORDS.copy(),
-            "guesses": [],
-            "game_over": False,
-        }
+        candidates = ALL_WORDS.copy()
 
-    GAMES[game_id] = state
-    return game_id, state
+    GAMES[game_id] = {
+        "mode": mode,
+        "candidates": candidates,
+        "guesses": [],
+        "game_over": False,
+    }
+
+    return game_id, GAMES[game_id]
 
 
 def get_game():
@@ -137,27 +132,6 @@ def guess():
     if guess_word not in ALL_WORDS_SET:
         return jsonify({"error": "Not in word list"})
 
-    # ---------------- EASY MODE ----------------
-    if game["mode"] == "easy":
-        secret = game["secret"]
-        pattern = score_pattern(guess_word, secret)
-
-        game["guesses"].append({"word": guess_word, "pattern": pattern})
-
-        if pattern == "GGGGG" or len(game["guesses"]) >= MAX_GUESSES:
-            game["game_over"] = True
-            return jsonify({
-                "pattern": pattern,
-                "game_over": True,
-                "final_word": secret
-            })
-
-        return jsonify({
-            "pattern": pattern,
-            "game_over": False
-        })
-
-    # ---------------- HARD MODE ----------------
     candidates = game["candidates"]
 
     pattern, new_candidates = choose_max_remaining_bucket(guess_word, candidates)
@@ -168,7 +142,9 @@ def guess():
     if pattern == "GGGGG" or len(game["guesses"]) >= MAX_GUESSES:
         game["game_over"] = True
 
+        # Reveal logic
         remaining_answers = [w for w in new_candidates if w in answers_set]
+
         if remaining_answers:
             final_word = random.choice(remaining_answers)
         else:
