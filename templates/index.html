@@ -8,26 +8,27 @@
 
 <h1>Wordle</h1>
 
+<div style="margin-bottom:15px;">
+    <button onclick="startNewGame('easy')">Easy</button>
+    <button onclick="startNewGame('hard')">Hard</button>
+</div>
+
 <div id="board"></div>
-
 <div id="keyboard"></div>
-
-<input id="input" maxlength="5" autofocus />
-<button onclick="submitGuess()">Enter</button>
-
 <div id="message"></div>
 
 <script>
 const board = document.getElementById("board");
-const input = document.getElementById("input");
 const message = document.getElementById("message");
 const keyboard = document.getElementById("keyboard");
 
 let row = 0;
+let col = 0;
 let gameOver = false;
-let keyStates = {}; // Track best state per letter
+let currentGuess = "";
+let keyStates = {};
 
-// Create board
+// ---------------- Create Board ----------------
 for (let r = 0; r < 6; r++) {
     let rowDiv = document.createElement("div");
     rowDiv.className = "row";
@@ -40,7 +41,7 @@ for (let r = 0; r < 6; r++) {
     board.appendChild(rowDiv);
 }
 
-// Create keyboard
+// ---------------- Keyboard ----------------
 const layout = [
     "QWERTYUIOP",
     "ASDFGHJKL",
@@ -51,7 +52,6 @@ layout.forEach((letters, index) => {
     const rowDiv = document.createElement("div");
     rowDiv.className = "key-row";
 
-    // Add Enter on last row
     if (index === 2) {
         const enterKey = document.createElement("div");
         enterKey.className = "key special";
@@ -65,92 +65,116 @@ layout.forEach((letters, index) => {
         key.className = "key";
         key.id = "key-" + letter;
         key.innerText = letter;
-
-        key.onclick = () => {
-            if (!gameOver && input.value.length < 5) {
-                input.value += letter.toLowerCase();
-            }
-        };
-
+        key.onclick = () => addLetter(letter);
         rowDiv.appendChild(key);
     });
 
-    // Add Backspace on last row
     if (index === 2) {
         const backKey = document.createElement("div");
         backKey.className = "key special";
         backKey.innerText = "⌫";
-        backKey.onclick = () => {
-            input.value = input.value.slice(0, -1);
-        };
+        backKey.onclick = removeLetter;
         rowDiv.appendChild(backKey);
     }
 
     keyboard.appendChild(rowDiv);
 });
 
-function submitGuess() {
-    if (gameOver) return;
+// ---------------- Typing Logic ----------------
+function addLetter(letter) {
+    if (gameOver || col >= 5) return;
 
-    const guess = input.value.toLowerCase();
-    if (guess.length !== 5) return;
-
-    fetch("/guess", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({guess})
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) {
-            message.innerText = data.error;
-            return;
-        }
-
-        for (let i = 0; i < 5; i++) {
-            const tile = document.getElementById(`tile-${row}-${i}`);
-            tile.innerText = guess[i].toUpperCase();
-            tile.classList.add(data.pattern[i]);
-
-            // Update keyboard colours
-            const letter = guess[i].toUpperCase();
-            const result = data.pattern[i];
-            const key = document.getElementById("key-" + letter);
-            if (!key) continue;
-
-            const current = keyStates[letter];
-
-            if (result === "G" ||
-                (result === "Y" && current !== "G") ||
-                (result === "B" && !current)) {
-
-                keyStates[letter] = result;
-                key.classList.remove("G", "Y", "B");
-                key.classList.add(result);
-            }
-        }
-
-        row++;
-        input.value = "";
-
-        if (data.game_over) {
-            gameOver = true;
-            input.disabled = true;
-
-            if (data.pattern === "GGGGG") {
-                message.innerText = "Correct! The word was " + data.final_word.toUpperCase();
-            } else {
-                message.innerText = "Unlucky. The word was " + data.final_word.toUpperCase();
-            }
-        }
-    });
+    const tile = document.getElementById(`tile-${row}-${col}`);
+    tile.innerText = letter;
+    currentGuess += letter.toLowerCase();
+    col++;
 }
 
-input.addEventListener("keypress", function(event) {
-    if (event.key === "Enter") {
+function removeLetter() {
+    if (gameOver || col === 0) return;
+
+    col--;
+    const tile = document.getElementById(`tile-${row}-${col}`);
+    tile.innerText = "";
+    currentGuess = currentGuess.slice(0, -1);
+}
+
+async function submitGuess() {
+    if (gameOver || currentGuess.length !== 5) return;
+
+    const res = await fetch("/guess", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({guess: currentGuess})
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+        message.innerText = data.error;
+        return;
+    }
+
+    for (let i = 0; i < 5; i++) {
+        const tile = document.getElementById(`tile-${row}-${i}`);
+        tile.classList.add(data.pattern[i]);
+
+        const letter = currentGuess[i].toUpperCase();
+        const result = data.pattern[i];
+        const key = document.getElementById("key-" + letter);
+
+        const current = keyStates[letter];
+
+        if (result === "G" ||
+            (result === "Y" && current !== "G") ||
+            (result === "B" && !current)) {
+
+            keyStates[letter] = result;
+            key.classList.remove("G", "Y", "B");
+            key.classList.add(result);
+        }
+    }
+
+    if (data.game_over) {
+        gameOver = true;
+        if (data.pattern === "GGGGG") {
+            message.innerText = "Correct! The word was " + data.final_word.toUpperCase();
+        } else {
+            message.innerText = "Unlucky. The word was " + data.final_word.toUpperCase();
+        }
+        return;
+    }
+
+    row++;
+    col = 0;
+    currentGuess = "";
+}
+
+// ---------------- Physical Keyboard ----------------
+document.addEventListener("keydown", function(event) {
+    if (gameOver) return;
+
+    const key = event.key;
+
+    if (/^[a-zA-Z]$/.test(key)) {
+        addLetter(key.toUpperCase());
+    } else if (key === "Backspace") {
+        removeLetter();
+    } else if (key === "Enter") {
         submitGuess();
     }
 });
+
+// ---------------- Mode Switch ----------------
+function startNewGame(mode) {
+    fetch("/new_game", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({mode})
+    }).then(() => {
+        location.reload();
+    });
+}
 </script>
 
 </body>
