@@ -8,11 +8,11 @@
 
 <h1>Wordle</h1>
 
-<div style="margin-bottom:15px;">
-    <button onclick="startNewGame('easy')">Easy</button>
-    <button onclick="startNewGame('hard')">Hard</button>
-    <button onclick="startNewGame('daily_easy')">Daily Easy</button>
-    <button onclick="startNewGame('daily_hard')">Daily Hard</button>
+<div class="mode-tabs">
+    <button class="mode-btn" id="mode-easy" onclick="startNewGame('easy')">Easy</button>
+    <button class="mode-btn" id="mode-hard" onclick="startNewGame('hard')">Hard</button>
+    <button class="mode-btn" id="mode-daily_easy" onclick="startNewGame('daily_easy')">Daily Easy</button>
+    <button class="mode-btn" id="mode-daily_hard" onclick="startNewGame('daily_hard')">Daily Hard</button>
 </div>
 
 <div id="board"></div>
@@ -82,7 +82,31 @@ layout.forEach((letters, index) => {
     keyboard.appendChild(rowDiv);
 });
 
-// Load existing state (for daily)
+function applyKeyboardFromGuess(word, pattern) {
+    for (let i = 0; i < 5; i++) {
+        const letter = word[i].toUpperCase();
+        const result = pattern[i];
+        const key = document.getElementById("key-" + letter);
+        if (!key) continue;
+
+        const current = keyStates[letter];
+
+        if (result === "G") {
+            keyStates[letter] = "G";
+        } else if (result === "Y") {
+            if (current !== "G") keyStates[letter] = "Y";
+        } else if (result === "B") {
+            if (!current) keyStates[letter] = "B";
+        }
+    }
+
+    for (const [letter, state] of Object.entries(keyStates)) {
+        const key = document.getElementById("key-" + letter);
+        key.classList.remove("G", "Y", "B");
+        key.classList.add(state);
+    }
+}
+
 async function loadExistingState() {
     const res = await fetch("/get_state");
     const game = await res.json();
@@ -98,33 +122,21 @@ async function loadExistingState() {
             tile.classList.add(guess.pattern[c]);
         }
 
+        applyKeyboardFromGuess(guess.word, guess.pattern);
         row++;
     }
 
-    if (game.game_over) {
-        gameOver = true;
-    }
+    if (game.game_over) gameOver = true;
+
+    highlightActiveMode(game.mode);
 }
 
-window.onload = loadExistingState;
-
-// Typing
-function addLetter(letter) {
-    if (gameOver || col >= 5) return;
-
-    const tile = document.getElementById(`tile-${row}-${col}`);
-    tile.innerText = letter;
-    currentGuess += letter.toLowerCase();
-    col++;
-}
-
-function removeLetter() {
-    if (gameOver || col === 0) return;
-
-    col--;
-    const tile = document.getElementById(`tile-${row}-${col}`);
-    tile.innerText = "";
-    currentGuess = currentGuess.slice(0, -1);
+function highlightActiveMode(mode) {
+    document.querySelectorAll(".mode-btn").forEach(btn => {
+        btn.classList.remove("active");
+    });
+    const activeBtn = document.getElementById("mode-" + mode);
+    if (activeBtn) activeBtn.classList.add("active");
 }
 
 async function submitGuess() {
@@ -145,23 +157,11 @@ async function submitGuess() {
 
     for (let i = 0; i < 5; i++) {
         const tile = document.getElementById(`tile-${row}-${i}`);
+        tile.innerText = currentGuess[i].toUpperCase();
         tile.classList.add(data.pattern[i]);
-
-        const letter = currentGuess[i].toUpperCase();
-        const result = data.pattern[i];
-        const key = document.getElementById("key-" + letter);
-
-        const current = keyStates[letter];
-
-        if (result === "G" ||
-            (result === "Y" && current !== "G") ||
-            (result === "B" && !current)) {
-
-            keyStates[letter] = result;
-            key.classList.remove("G", "Y", "B");
-            key.classList.add(result);
-        }
     }
+
+    applyKeyboardFromGuess(currentGuess, data.pattern);
 
     if (data.game_over) {
         gameOver = true;
@@ -177,6 +177,22 @@ async function submitGuess() {
     currentGuess = "";
 }
 
+function addLetter(letter) {
+    if (gameOver || col >= 5) return;
+    const tile = document.getElementById(`tile-${row}-${col}`);
+    tile.innerText = letter;
+    currentGuess += letter.toLowerCase();
+    col++;
+}
+
+function removeLetter() {
+    if (gameOver || col === 0) return;
+    col--;
+    const tile = document.getElementById(`tile-${row}-${col}`);
+    tile.innerText = "";
+    currentGuess = currentGuess.slice(0, -1);
+}
+
 function startNewGame(mode) {
     fetch("/new_game", {
         method: "POST",
@@ -187,7 +203,6 @@ function startNewGame(mode) {
 
 document.addEventListener("keydown", function(event) {
     if (gameOver) return;
-
     const key = event.key;
 
     if (/^[a-zA-Z]$/.test(key)) {
@@ -198,6 +213,8 @@ document.addEventListener("keydown", function(event) {
         submitGuess();
     }
 });
+
+window.onload = loadExistingState;
 </script>
 
 </body>
